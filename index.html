@@ -1,1 +1,218 @@
-abc
+<!DOCTYPE html>
+<html lang="as">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+  <title>Wikipedia Infobox Fetcher</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f9f9f9;
+      color: #333;
+      margin: 0;
+      padding: 1rem;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      min-height: 100vh;
+    }
+    .container {
+      background: white;
+      padding: 1rem;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgb(0 0 0 / 0.1);
+      width: 400px; /* Fixed width */
+      box-sizing: border-box;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    h1 {
+      margin-top: 0;
+      text-align: center;
+    }
+    label {
+      align-self: flex-start;
+      font-weight: bold;
+      margin-bottom: 0.3rem;
+    }
+    input, select, button, textarea {
+      width: 100%;
+      padding: 0.5rem;
+      font-size: 1rem;
+      margin-bottom: 1rem;
+      box-sizing: border-box;
+      border-radius: 4px;
+      border: 1px solid #ccc;
+    }
+    button {
+      background-color: #007bff;
+      color: white;
+      border: none;
+      cursor: pointer;
+      max-width: 200px;
+      transition: background-color 0.3s ease;
+    }
+    button:hover {
+      background-color: #0056b3;
+    }
+    textarea {
+      font-family: monospace;
+      resize: vertical;
+      min-height: 180px;
+      max-height: 320px;
+    }
+    #copyBtn {
+      margin: 0 auto 1rem auto;
+      max-width: 200px;
+    }
+    .status {
+      align-self: flex-start;
+      margin-bottom: 1rem;
+      font-style: italic;
+      color: #555;
+      min-height: 1.2em;
+    }
+    footer {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      max-width: 400px;
+      background: #f1f1f1;
+      padding: 0.7rem 0;
+      text-align: center;
+      color: #666;
+      font-size: 0.9rem;
+      box-shadow: 0 -1px 5px rgba(0,0,0,0.1);
+      border-radius: 8px 8px 0 0;
+      margin: 0 auto;
+      left: 50%;
+      transform: translateX(-50%);
+    }
+    footer p {
+      margin: 0.2rem 0;
+    }
+
+    /* Small screen adjustment */
+    @media (max-width: 420px) {
+      .container, footer {
+        width: 100%;
+        max-width: 100%;
+        border-radius: 0;
+        box-shadow: none;
+      }
+      button, #copyBtn {
+        max-width: 100%;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <h1>Wikipedia Infobox Fetcher</h1>
+
+    <label for="sourceLang">Source Wikipedia Language:</label>
+    <select id="sourceLang">
+      <option value="en" selected>English</option>
+      <option value="as">Assamese (অসমীয়া)</option>
+      <option value="hi">Hindi (हिन्दी)</option>
+      <!-- Bengali removed -->
+    </select>
+
+    <label for="articleName">Article name:</label>
+    <input type="text" id="articleName" placeholder="Enter article name" />
+
+    <button id="fetchBtn">Fetch Infobox</button>
+
+    <div class="status" id="status"></div>
+
+    <label for="infoboxText">Infobox Wikitext:</label>
+    <textarea id="infoboxText" readonly></textarea>
+    <button id="copyBtn">Copy to Clipboard</button>
+  </div>
+
+  <footer>
+    <p>Made with ❤️ by Sauravhhh</p>
+    <p>জয় আই অসম</p>
+  </footer>
+
+<script>
+  const fetchBtn = document.getElementById('fetchBtn');
+  const sourceLangSelect = document.getElementById('sourceLang');
+  const articleNameInput = document.getElementById('articleName');
+  const statusDiv = document.getElementById('status');
+  const infoboxTextArea = document.getElementById('infoboxText');
+  const copyBtn = document.getElementById('copyBtn');
+
+  async function fetchWikitext(article, lang) {
+    const url = `https://${lang}.wikipedia.org/w/api.php?action=parse&page=${encodeURIComponent(article)}&prop=wikitext&format=json&origin=*&section=0`;
+    const res = await fetch(url);
+    if(!res.ok) throw new Error('Failed to fetch Wikipedia content');
+    const data = await res.json();
+    if(data.error) throw new Error(data.error.info);
+    return data.parse.wikitext['*'];
+  }
+
+  function extractInfobox(wikitext) {
+    let start = wikitext.indexOf('{{Infobox');
+    if (start === -1) return null;
+    let count = 2; // for {{
+    let idx = start + 8;
+    while(count > 0 && idx < wikitext.length){
+      if(wikitext[idx] === '{' && wikitext[idx+1] === '{'){
+        count += 2; idx += 2;
+      } else if(wikitext[idx] === '}' && wikitext[idx+1] === '}'){
+        count -= 2; idx += 2;
+      } else {
+        idx++;
+      }
+    }
+    if(count !== 0) return null;
+    return wikitext.substring(start, idx);
+  }
+
+  fetchBtn.addEventListener('click', async () => {
+    const article = articleNameInput.value.trim();
+    const lang = sourceLangSelect.value;
+    infoboxTextArea.value = '';
+    statusDiv.textContent = '';
+
+    if(!article){
+      alert('Please enter the article name');
+      return;
+    }
+
+    statusDiv.textContent = `Fetching infobox from ${lang} Wikipedia...`;
+
+    try {
+      const wikitext = await fetchWikitext(article, lang);
+      const infobox = extractInfobox(wikitext);
+
+      if(!infobox){
+        statusDiv.textContent = 'No infobox found in this article.';
+        return;
+      }
+      infoboxTextArea.value = infobox;
+      statusDiv.textContent = 'Infobox fetched successfully.';
+    } catch(e){
+      statusDiv.textContent = 'Error: ' + e.message;
+    }
+  });
+
+  copyBtn.addEventListener('click', () => {
+    const text = infoboxTextArea.value;
+    if(!text) return;
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(text).then(() => {
+        copyBtn.textContent = 'Copied!';
+        setTimeout(() => copyBtn.textContent = 'Copy to Clipboard', 2000);
+      });
+    }
+  });
+</script>
+
+</body>
+  </html>
+  
